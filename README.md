@@ -1,6 +1,7 @@
 # esx_identity
 esx_identity fork that makes use of ox_lib for its registration menu. [Click here for the original esx_identity](https://github.com/esx-framework/esx_core/tree/main/%5Bcore%5D/esx_identity).
-
+## Updates planned
+Use locales instead of hard coded strings
 ## Requirements
 
 [esx_skin](./../esx_skin/README.md)
