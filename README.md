@@ -1,4 +1,4 @@
-# esx_identity
+# esx_identity using ox_lib
 esx_identity fork that makes use of ox_lib for its registration menu. [Click here for the original esx_identity](https://github.com/esx-framework/esx_core/tree/main/%5Bcore%5D/esx_identity).
 
 Note: This does of course not drop compatibility with resources depending on esx_identiy and is intended to be a drag-and-drop experience. Report any issues here on github.
