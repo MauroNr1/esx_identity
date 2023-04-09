@@ -2,6 +2,8 @@
 
 A Core Resource that Allows the player to Pick their characters, Name, Gender, Height and Date-of-birth, using a fancy ox_lib input dialog.
 
+Want the newest release automagically? Click here: https://github.com/MauroNr1/esx_identity/releases/latest
+
 # Information
 
 ### This script supports locales. Please contribute to this project and translate it to your own language.
