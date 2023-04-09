@@ -36,19 +36,6 @@ local function saveIdentityToDatabase(identifier, identity)
         {identity.firstName, identity.lastName, identity.dateOfBirth, identity.sex, identity.height, identifier})
 end
 
-local function formatDate(str)
-    local date
-    if Config.DateFormat == "DD/MM/YYYY" then
-        date = os.date('%d/%m/%Y', tonumber(str))
-    elseif Config.DateFormat == "MM/DD/YYYY" then
-        date = os.date('%m/%d/%Y', tonumber(str))
-    elseif Config.DateFormat == "YYYY/MM/DD" then
-        date = os.date('%Y/%m/%d', tonumber(str))
-    end
-
-    return date
-end
-
 local function convertToLowerCase(str)
     return string.lower(str)
 end
@@ -62,9 +49,20 @@ local function formatName(name)
     return convertFirstLetterToUpper(loweredName)
 end
 
-if Config.UseDeferrals then
-    print("Deferrals are experimental and should not be used. Please put this to false in config.")
-else
+local function formatDate(str)
+    local date
+    if Config.DateFormat == "DD/MM/YYYY" then
+        date = os.date('%d/%m/%Y', tonumber(str))
+    elseif Config.DateFormat == "MM/DD/YYYY" then
+        date = os.date('%m/%d/%Y', tonumber(str))
+    elseif Config.DateFormat == "YYYY/MM/DD" then
+        date = os.date('%Y/%m/%d', tonumber(str))
+    end
+
+    return date
+end
+
+if not Config.UseDeferrals then
 	local function setIdentity(xPlayer)
 		if not alreadyRegistered[xPlayer.identifier] then
             return
@@ -111,18 +109,97 @@ else
         )
 	end
 
+	if not multichar then
+		AddEventHandler('playerConnecting', function(playerName, setKickReason, deferrals)
+			deferrals.defer()
+			local playerId, identifier = source, ESX.GetIdentifier(source)
+			Wait(40)
+
+			if not identifier then
+                return deferrals.done(TranslateCap('no_identifier'))
+            end
+            MySQL.single('SELECT firstname, lastname, dateofbirth, sex, height FROM users WHERE identifier = ?', {identifier}, 
+                function(result)
+                    if not result then
+                        playerIdentity[identifier] = nil
+                        alreadyRegistered[identifier] = false
+                        return deferrals.done()
+                    end
+                    if not result.firstname then
+                        playerIdentity[identifier] = nil
+                        alreadyRegistered[identifier] = false
+                        return deferrals.done()
+                    end
+
+                    playerIdentity[identifier] = {
+                        firstName = result.firstname,
+                        lastName = result.lastname,
+                        dateOfBirth = result.dateofbirth,
+                        sex = result.sex,
+                        height = result.height
+                    }
+
+                    alreadyRegistered[identifier] = true
+
+                    deferrals.done()
+                end)
+		end)
+
+		AddEventHandler('onResourceStart', function(resource)
+            if resource ~= GetCurrentResourceName() then
+                return
+            end
+            Wait(300)
+
+            while not ESX do Wait(0) end
+
+            local xPlayers = ESX.GetExtendedPlayers()
+
+            for i=1, #(xPlayers) do 
+                if xPlayers[i] then
+                    checkIdentity(xPlayers[i])
+                end
+            end
+        end)
+
+		RegisterNetEvent('esx:playerLoaded', function(playerId, xPlayer)
+			local currentIdentity = playerIdentity[xPlayer.identifier]
+
+            if currentIdentity and alreadyRegistered[xPlayer.identifier] then
+                xPlayer.setName(('%s %s'):format(currentIdentity.firstName, currentIdentity.lastName))
+                xPlayer.set('firstName', currentIdentity.firstName)
+                xPlayer.set('lastName', currentIdentity.lastName)
+                xPlayer.set('dateofbirth', currentIdentity.dateOfBirth)
+                xPlayer.set('sex', currentIdentity.sex)
+                xPlayer.set('height', currentIdentity.height)
+                TriggerClientEvent('esx_identity:setPlayerData', xPlayer.source, currentIdentity)
+                if currentIdentity.saveToDatabase then
+                    saveIdentityToDatabase(xPlayer.identifier, currentIdentity)
+                end
+
+                Wait(0)
+
+                TriggerClientEvent('esx_identity:alreadyRegistered', xPlayer.source)
+
+                playerIdentity[xPlayer.identifier] = nil
+            else
+                TriggerClientEvent('esx_identity:showRegisterIdentity', xPlayer.source)
+            end
+		end)
+	end
+
 	ESX.RegisterServerCallback('esx_identity:registerIdentity', function(source, cb, data)
-        data.dateofbirth = formatDate(data.dateofbirth) --We have to do this on the server because for some reason FiveM only allows os on the server
 		local xPlayer = ESX.GetPlayerFromId(source)
-	    if xPlayer then	
+
+		if xPlayer then	
 			if alreadyRegistered[xPlayer.identifier] then
 				xPlayer.showNotification(TranslateCap('already_registered'), "error")
 				return cb(false)
             end
 
             playerIdentity[xPlayer.identifier] = {
-                firstName = formatName(data.firstname),
-                lastName = formatName(data.lastname),
+                firstName = formatName(string.sub(data.firstname, 1, Config.MaxNameLength)),
+                lastName = formatName(string.sub(data.lastname, 1, Config.MaxNameLength)),
                 dateOfBirth = formatDate(data.dateofbirth),
                 sex = data.sex,
                 height = data.height
@@ -148,8 +225,8 @@ else
             return cb(false)
         end
 
-        local formattedFirstName = formatName(data.firstname)
-        local formattedLastName = formatName(data.lastname)
+        local formattedFirstName = formatName(string.sub(data.firstname, 1, Config.MaxNameLength))
+        local formattedLastName = formatName(string.sub(data.lastname, 1, Config.MaxNameLength))
         local formattedDate = formatDate(data.dateofbirth)
 
         data.firstname = formattedFirstName
@@ -198,54 +275,4 @@ if Config.EnableCommands then
             xPlayer.showNotification(TranslateCap('error_delete_character'))
         end
     end, false, {help = TranslateCap('delete_character')})
-end
-
-if Config.EnableDebugging then
-    ESX.RegisterCommand('xPlayerGetFirstName', 'user', function(xPlayer, args, showError)
-        if xPlayer and xPlayer.get('firstName') then
-            xPlayer.showNotification(TranslateCap('return_debug_xPlayer_get_first_name', xPlayer.get('firstName')))
-        else
-            xPlayer.showNotification(TranslateCap('error_debug_xPlayer_get_first_name'))
-        end
-    end, false, {help = TranslateCap('debug_xPlayer_get_first_name')})
-
-    ESX.RegisterCommand('xPlayerGetLastName', 'user', function(xPlayer, args, showError)
-        if xPlayer and xPlayer.get('lastName') then
-            xPlayer.showNotification(TranslateCap('return_debug_xPlayer_get_last_name', xPlayer.get('lastName')))
-        else
-            xPlayer.showNotification(TranslateCap('error_debug_xPlayer_get_last_name'))
-        end
-    end, false, {help = TranslateCap('debug_xPlayer_get_last_name')})
-
-    ESX.RegisterCommand('xPlayerGetFullName', 'user', function(xPlayer, args, showError)
-        if xPlayer and xPlayer.getName() then
-            xPlayer.showNotification(TranslateCap('return_debug_xPlayer_get_full_name', xPlayer.getName()))
-        else
-            xPlayer.showNotification(TranslateCap('error_debug_xPlayer_get_full_name'))
-        end
-    end, false, {help = TranslateCap('debug_xPlayer_get_full_name')})
-
-    ESX.RegisterCommand('xPlayerGetSex', 'user', function(xPlayer, args, showError)
-        if xPlayer and xPlayer.get('sex') then
-            xPlayer.showNotification(TranslateCap('return_debug_xPlayer_get_sex', xPlayer.get('sex')))
-        else
-            xPlayer.showNotification(TranslateCap('error_debug_xPlayer_get_sex'))
-        end
-    end, false, {help = TranslateCap('debug_xPlayer_get_sex')})
-
-    ESX.RegisterCommand('xPlayerGetDOB', 'user', function(xPlayer, args, showError)
-        if xPlayer and xPlayer.get('dateofbirth') then
-            xPlayer.showNotification(TranslateCap('return_debug_xPlayer_get_dob', xPlayer.get('dateofbirth')))
-        else
-            xPlayer.showNotification(TranslateCap('error_debug_xPlayer_get_dob'))
-        end
-    end, false, {help = TranslateCap('debug_xPlayer_get_dob')})
-
-    ESX.RegisterCommand('xPlayerGetHeight', 'user', function(xPlayer, args, showError)
-        if xPlayer and xPlayer.get('height') then
-            xPlayer.showNotification(TranslateCap('return_debug_xPlayer_get_height', xPlayer.get('height')))
-        else
-            xPlayer.showNotification(TranslateCap('error_debug_xPlayer_get_height'))
-        end
-    end, false, {help = TranslateCap('debug_xPlayer_get_height')})
 end

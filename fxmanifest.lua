@@ -4,12 +4,12 @@ game 'gta5'
 
 description 'ESX Identity'
 lua54 'yes'
-version '1.9.3'
+version '1.9.4'
 
 shared_scripts {
 	'@es_extended/imports.lua',
 	'@es_extended/locale.lua',
-	'@ox_lib/init.lua'
+	'@ox_lib/init.lua',
 }
 
 server_scripts {
@@ -23,6 +23,14 @@ client_scripts {
 	'locales/*.lua',
 	'config.lua',
 	'client/main.lua'
+}
+
+ui_page 'html/index.html'
+
+files {
+	'html/index.html',
+	'html/js/script.js',
+	'html/css/style.css',
 }
 
 dependency 'es_extended'
