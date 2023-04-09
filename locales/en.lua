@@ -20,7 +20,7 @@ Locales['en'] = {
 
   ['prepared_to_rp'] = 'I am willing to roleplay according to the rules.',
 
-  ['application_accepted'] = 'Application accepted. Welcome!'
+  ['application_accepted'] = 'Application accepted. Welcome!',
 
   ['show_active_character'] = 'Show Active Character',
   ['active_character'] = 'Active character: %s',
